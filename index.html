@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ichancy Bot - عجلة الحظ الذهبية</title>
   <style>
+    /* ALL YOUR ORIGINAL CSS STYLES EXACTLY AS THEY ARE */
     :root{--bg1:#0b2f8f;--bg2:#071b63;--blueA:#1b51e7;--blueB:#dff5ff;--text:#ffffff;--gold1:#ffe27a;--gold2:#ffc107;--lime1:#efff9d;--lime2:#b9ef00;--result:#d8ff79;}
     *{box-sizing:border-box} html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;background:radial-gradient(circle at 50% 24%, rgba(255,255,255,.18), transparent 14%),radial-gradient(circle at 15% 12%, rgba(255,255,255,.10), transparent 2%),radial-gradient(circle at 82% 18%, rgba(255,255,255,.12), transparent 2%),radial-gradient(circle at 9% 68%, rgba(255,255,255,.10), transparent 1.6%),radial-gradient(circle at 90% 80%, rgba(255,255,255,.08), transparent 1.6%),linear-gradient(180deg, var(--bg1), var(--bg2));color:var(--text);overflow-x:hidden}
     .wrap{width:min(100%,760px);margin:0 auto;padding:18px 16px 28px;text-align:center} .title-en{margin:6px 0 8px;font-size:clamp(34px,8vw,62px);font-weight:900;letter-spacing:.6px;color:transparent;background:linear-gradient(180deg,#fff2a6 0%, var(--gold1) 35%, var(--gold2) 100%);-webkit-background-clip:text;background-clip:text;text-shadow:0 0 16px rgba(255,198,0,.45),0 0 30px rgba(255,198,0,.28)} .title-ar{margin:0 0 18px;font-size:clamp(28px,7vw,50px);font-weight:900;color:#f4f7ff;text-shadow:0 3px 14px rgba(0,0,0,.35)}
@@ -24,30 +25,193 @@
     <div class="wheel-zone" id="wheelZone">
       <div class="pointer"></div><div class="halo"></div><div class="ring"></div><canvas id="wheelCanvas" width="900" height="900"></canvas><div class="inner-ring"></div><div class="hub"></div><div class="sparkles" id="sparkles"></div>
     </div>
-    <div class="card" id="statusCard">جاري التحقق من حالتك...</div>
-    <button class="spin-btn" id="spinBtn" disabled>↻ SPIN</button>
+    <div class="card" id="statusCard">اضغط SPIN للدوران!</div>
+    <button class="spin-btn" id="spinBtn">↻ SPIN</button>
     <button class="sound-pill" id="soundBtn">🔊 الصوت: يعمل</button>
     <div class="result-box">
       <div class="result" id="result">النتيجة: جاهز</div>
-      <div class="note">هذه واجهة Mini App. عند الربط الفعلي تأتي النتيجة من النظام وليس من الواجهة.</div>
+      <div class="note">النتيجة ترسل تلقائياً إلى البوت</div>
     </div>
   </div>
 <script>
-const rewards=[{label:"1000",color:"#1d55e8",text:"#fff"},{label:"2000",color:"#dff6ff",text:"#1346a8"},{label:"10000",color:"#1d55e8",text:"#fff"},{label:"20000",color:"#dff6ff",text:"#1346a8"},{label:"50000",color:"#1d55e8",text:"#fff"},{label:"100000",color:"#dff6ff",text:"#1346a8"},{label:"200000",color:"#1d55e8",text:"#fff"},{label:"Hard Luck 😭",color:"#dff6ff",text:"#1346a8"}];
-const canvas=document.getElementById('wheelCanvas'), ctx=canvas.getContext('2d'), spinBtn=document.getElementById('spinBtn'), soundBtn=document.getElementById('soundBtn'), resultBox=document.getElementById('result'), wheelZone=document.getElementById('wheelZone'), sparkles=document.getElementById('sparkles'), statusCard=document.getElementById('statusCard');
-let rotation=0, spinning=false, soundOn=true, audioCtx=null, tickTimer=null; const anglePer=360/rewards.length;
-function drawWheel(){const cx=canvas.width/2, cy=canvas.height/2, r=canvas.width/2 - 6; ctx.clearRect(0,0,canvas.width,canvas.height); rewards.forEach((item,i)=>{const startDeg=-90+i*anglePer, endDeg=startDeg+anglePer, start=startDeg*Math.PI/180, end=endDeg*Math.PI/180; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,start,end); ctx.closePath(); ctx.fillStyle=item.color; ctx.fill(); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,start,end); ctx.closePath(); ctx.lineWidth=4; ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.stroke(); ctx.save(); ctx.translate(cx,cy); ctx.rotate((start+end)/2); ctx.translate(r*0.68,0); ctx.rotate(Math.PI/2); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle=item.text; ctx.font='bold '+(item.label.includes('Hard') ? 34 : 44)+'px Arial'; if(item.label.includes('Hard')){ctx.fillText('Hard',0,-20);ctx.fillText('Luck 😭',0,20);} else {ctx.fillText(item.label,0,0);} ctx.restore();}); ctx.beginPath(); ctx.arc(cx,cy,r-2,0,Math.PI*2); ctx.lineWidth=10; ctx.strokeStyle='rgba(255,255,255,.32)'; ctx.stroke();}
-function ensureAudio(){if(!audioCtx){audioCtx=new (window.AudioContext||window.webkitAudioContext)()} if(audioCtx.state==='suspended') audioCtx.resume()}
-function tone(freq,duration=0.1,type='sine',volume=0.04,endFreq=null){if(!soundOn) return; ensureAudio(); const now=audioCtx.currentTime; const osc=audioCtx.createOscillator(); const gain=audioCtx.createGain(); osc.type=type; osc.frequency.setValueAtTime(freq,now); if(endFreq){osc.frequency.exponentialRampToValueAtTime(endFreq,now+duration)} gain.gain.setValueAtTime(0.0001,now); gain.gain.exponentialRampToValueAtTime(volume,now+0.01); gain.gain.exponentialRampToValueAtTime(0.0001,now+duration); osc.connect(gain).connect(audioCtx.destination); osc.start(now); osc.stop(now+duration+0.03);}
-function playTicks(total=5200){if(!soundOn) return; clearTimeout(tickTimer); let elapsed=0; function step(){const ratio=elapsed/total; tone(860-Math.min(520,ratio*480),0.04,'triangle',0.022); let next=60; if(ratio>.45) next=90; if(ratio>.65) next=120; if(ratio>.82) next=180; elapsed+=next; if(elapsed<total){tickTimer=setTimeout(step,next)}} step();}
-function playWin(){tone(740,.12,'triangle',.055); setTimeout(()=>tone(980,.14,'triangle',.06),120); setTimeout(()=>tone(1320,.18,'sine',.065),260); if(navigator.vibrate) navigator.vibrate([90,40,120,40,180]);}
-function playLose(){tone(280,.18,'sawtooth',.045,160); setTimeout(()=>tone(180,.18,'triangle',.04,120),160); if(navigator.vibrate) navigator.vibrate(120);}
-function addSparkles(){sparkles.innerHTML=''; for(let i=0;i<24;i++){const el=document.createElement('i'); el.style.left=(45+Math.random()*10)+'%'; el.style.top=(45+Math.random()*10)+'%'; el.style.setProperty('--x',((Math.random()-.5)*360)+'px'); el.style.setProperty('--y',((Math.random()-.5)*320)+'px'); sparkles.appendChild(el)} setTimeout(()=>sparkles.innerHTML='',1200);}
+// Initialize Telegram WebApp
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const rewards=[
+  {label:"1000",color:"#1d55e8",text:"#fff"},
+  {label:"2000",color:"#dff6ff",text:"#1346a8"},
+  {label:"10000",color:"#1d55e8",text:"#fff"},
+  {label:"20000",color:"#dff6ff",text:"#1346a8"},
+  {label:"50000",color:"#1d55e8",text:"#fff"},
+  {label:"100000",color:"#dff6ff",text:"#1346a8"},
+  {label:"200000",color:"#1d55e8",text:"#fff"},
+  {label:"Hard Luck 😭",color:"#dff6ff",text:"#1346a8"}
+];
+
+const canvas=document.getElementById('wheelCanvas'), 
+      ctx=canvas.getContext('2d'), 
+      spinBtn=document.getElementById('spinBtn'), 
+      soundBtn=document.getElementById('soundBtn'), 
+      resultBox=document.getElementById('result'), 
+      wheelZone=document.getElementById('wheelZone'), 
+      sparkles=document.getElementById('sparkles'), 
+      statusCard=document.getElementById('statusCard');
+
+let rotation=0, spinning=false, soundOn=true, audioCtx=null, tickTimer=null;
+const anglePer=360/rewards.length;
+
+function drawWheel(){
+  const cx=canvas.width/2, cy=canvas.height/2, r=canvas.width/2 - 6; 
+  ctx.clearRect(0,0,canvas.width,canvas.height); 
+  rewards.forEach((item,i)=>{
+    const startDeg=-90+i*anglePer, endDeg=startDeg+anglePer, 
+          start=startDeg*Math.PI/180, end=endDeg*Math.PI/180; 
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,start,end); ctx.closePath(); 
+    ctx.fillStyle=item.color; ctx.fill(); 
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,start,end); ctx.closePath(); 
+    ctx.lineWidth=4; ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.stroke(); 
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate((start+end)/2); 
+    ctx.translate(r*0.68,0); ctx.rotate(Math.PI/2); 
+    ctx.textAlign='center'; ctx.textBaseline='middle'; 
+    ctx.fillStyle=item.text; 
+    ctx.font='bold '+(item.label.includes('Hard') ? 34 : 44)+'px Arial'; 
+    if(item.label.includes('Hard')){
+      ctx.fillText('Hard',0,-20);ctx.fillText('Luck 😭',0,20);
+    } else {ctx.fillText(item.label,0,0);} 
+    ctx.restore();
+  }); 
+  ctx.beginPath(); ctx.arc(cx,cy,r-2,0,Math.PI*2); 
+  ctx.lineWidth=10; ctx.strokeStyle='rgba(255,255,255,.32)'; ctx.stroke();
+}
+
+function ensureAudio(){
+  if(!audioCtx){audioCtx=new (window.AudioContext||window.webkitAudioContext)()} 
+  if(audioCtx.state==='suspended') audioCtx.resume()
+}
+
+function tone(freq,duration=0.1,type='sine',volume=0.04,endFreq=null){
+  if(!soundOn) return; ensureAudio(); 
+  const now=audioCtx.currentTime; 
+  const osc=audioCtx.createOscillator(); 
+  const gain=audioCtx.createGain(); 
+  osc.type=type; osc.frequency.setValueAtTime(freq,now); 
+  if(endFreq){osc.frequency.exponentialRampToValueAtTime(endFreq,now+duration)} 
+  gain.gain.setValueAtTime(0.0001,now); gain.gain.exponentialRampToValueAtTime(volume,now+0.01); 
+  gain.gain.exponentialRampToValueAtTime(0.0001,now+duration); 
+  osc.connect(gain).connect(audioCtx.destination); osc.start(now); osc.stop(now+duration+0.03);
+}
+
+function playTicks(total=5200){
+  if(!soundOn) return; clearTimeout(tickTimer); 
+  let elapsed=0; 
+  function step(){
+    const ratio=elapsed/total; tone(860-Math.min(520,ratio*480),0.04,'triangle',0.022); 
+    let next=60; if(ratio>.45) next=90; if(ratio>.65) next=120; if(ratio>.82) next=180; 
+    elapsed+=next; if(elapsed<total){tickTimer=setTimeout(step,next)}
+  } step();
+}
+
+function playWin(){
+  tone(740,.12,'triangle',.055); 
+  setTimeout(()=>tone(980,.14,'triangle',.06),120); 
+  setTimeout(()=>tone(1320,.18,'sine',.065),260); 
+  if(navigator.vibrate) navigator.vibrate([90,40,120,40,180]);
+}
+
+function playLose(){
+  tone(280,.18,'sawtooth',.045,160); 
+  setTimeout(()=>tone(180,.18,'triangle',.04,120),160); 
+  if(navigator.vibrate) navigator.vibrate(120);
+}
+
+function addSparkles(){
+  sparkles.innerHTML=''; 
+  for(let i=0;i<24;i++){
+    const el=document.createElement('i'); 
+    el.style.left=(45+Math.random()*10)+'%'; el.style.top=(45+Math.random()*10)+'%'; 
+    el.style.setProperty('--x',((Math.random()-.5)*360)+'px'); 
+    el.style.setProperty('--y',((Math.random()-.5)*320)+'px'); 
+    sparkles.appendChild(el)
+  } 
+  setTimeout(()=>sparkles.innerHTML='',1200);
+}
+
 function normalize(x){return ((x%360)+360)%360;}
-function spinTo(label){if(spinning) return; spinning=true; spinBtn.disabled=true; wheelZone.classList.remove('glow','shake'); const idx=rewards.findIndex(r=>r.label===label); const targetCenter=idx*anglePer+anglePer/2; const finalNorm=360-targetCenter; const startNorm=normalize(rotation); let delta=finalNorm-startNorm; if(delta<0) delta+=360; const finalRotation=rotation+2160+delta; const duration=5200; playTicks(duration); canvas.style.transition=`transform ${duration}ms cubic-bezier(.14,.9,.13,1)`; canvas.style.transform=`rotate(${finalRotation}deg)`; setTimeout(()=>{rotation=finalRotation; spinning=false; spinBtn.disabled=true; if(label.includes('Hard')){resultBox.textContent=`النتيجة: ${label}`; wheelZone.classList.add('shake'); playLose();} else {resultBox.textContent=`النتيجة: ${label}`; wheelZone.classList.add('glow'); addSparkles(); playWin();}}, duration+40);}
-window.WheelMiniApp={setStatus:(t)=>statusCard.textContent=t,setReady:(ok)=>{spinBtn.disabled=!ok;},spinToResult:(label)=>spinTo(label),setResultText:(t)=>resultBox.textContent=t};
-spinBtn.addEventListener('click', ()=>{ if(window.Telegram && Telegram.WebApp){ Telegram.WebApp.sendData(JSON.stringify({event:'wheel_spin_click'})); } else { alert('هذه النسخة تحتاج ربط Telegram Mini App أو استدعاء WheelMiniApp.spinToResult من النظام.'); } });
-soundBtn.addEventListener('click',()=>{soundOn=!soundOn; soundBtn.textContent=soundOn?'🔊 الصوت: يعمل':'🔇 الصوت: متوقف'; if(soundOn) tone(620,.08,'triangle',.035);}); drawWheel();
+
+// MAIN SPIN FUNCTION (called when user clicks SPIN)
+function spin(){
+  if(spinning) return; 
+  spinning=true; 
+  spinBtn.disabled=true; 
+  wheelZone.classList.remove('glow','shake');
+  
+  // Pick a random reward
+  const randomIndex = Math.floor(Math.random() * rewards.length);
+  const selectedReward = rewards[randomIndex];
+  
+  const idx = rewards.indexOf(selectedReward);
+  const targetCenter = idx*anglePer + anglePer/2;
+  const finalNorm = 360 - targetCenter;
+  const startNorm = normalize(rotation);
+  let delta = finalNorm - startNorm;
+  if(delta < 0) delta += 360;
+  const finalRotation = rotation + 2160 + delta;
+  const duration = 5200;
+  
+  playTicks(duration);
+  canvas.style.transition = `transform ${duration}ms cubic-bezier(.14,.9,.13,1)`;
+  canvas.style.transform = `rotate(${finalRotation}deg)`;
+  
+  setTimeout(() => {
+    rotation = finalRotation;
+    spinning = false;
+    
+    // Show result
+    resultBox.textContent = `النتيجة: ${selectedReward.label}`;
+    
+    if(selectedReward.label.includes('Hard')){
+      wheelZone.classList.add('shake'); 
+      playLose();
+    } else {
+      wheelZone.classList.add('glow'); 
+      addSparkles(); 
+      playWin();
+    }
+    
+    // SEND RESULT TO TELEGRAM BOT
+    const userId = tg.initDataUnsafe?.user?.id || "anonymous";
+    const dataToSend = JSON.stringify({
+      prize: selectedReward.label,
+      userId: userId
+    });
+    
+    tg.sendData(dataToSend);
+    
+    // Re-enable button after short delay
+    setTimeout(() => {
+      spinBtn.disabled = false;
+      statusCard.textContent = 'اضغط SPIN للدوران مرة أخرى!';
+    }, 1000);
+  }, duration + 40);
+  
+  statusCard.textContent = 'جاري الدوران...';
+}
+
+// Event listeners
+spinBtn.addEventListener('click', spin);
+
+soundBtn.addEventListener('click', () => {
+  soundOn = !soundOn; 
+  soundBtn.textContent = soundOn ? '🔊 الصوت: يعمل' : '🔇 الصوت: متوقف'; 
+  if(soundOn) tone(620,.08,'triangle',.035);
+});
+
+// Initial draw
+drawWheel();
+spinBtn.disabled = false;
+statusCard.textContent = 'اضغط SPIN للدوران!';
 </script>
 </body>
 </html>
