@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spin Wheel</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; background: #1a1a2e; color: white; font-family: Arial; }
+        canvas { margin: 20px 0; }
+        button { padding: 15px 30px; font-size: 18px; background: #e94560; border: none; color: white; border-radius: 10px; cursor: pointer; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h2>🎰 Spin & Win</h2>
+    <canvas id="wheel" width="300" height="300"></canvas>
+    <button id="spinBtn">Spin</button>
+    <p id="cooldownMsg"></p>
+
+    <script>
+        // ------- CUSTOMIZE HERE -------
+        const segments = [
+            { label: "10 Coins", color: "#FF6B6B" },
+            { label: "5 Coins",  color: "#4ECDC4" },
+            { label: "Try Again",color: "#45B7D1" },
+            { label: "20 Coins", color: "#96CEB4" },
+            { label: "No Prize", color: "#FFEAA7" },
+            { label: "50 Coins", color: "#DDA0DD" },
+            { label: "Try Again",color: "#98D8C8" },
+            { label: "100 Coins",color: "#F7DC6F" }
+        ];
+        const COOLDOWN_SEC = 60; // seconds between spins
+        // ------------------------------
+
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const btn = document.getElementById('spinBtn');
+        const cooldownMsg = document.getElementById('cooldownMsg');
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let spinning = false;
+        let angle = 0;
+        const arcSize = (2 * Math.PI) / segments.length;
+
+        function drawWheel(rotation = 0) {
+            ctx.clearRect(0, 0, 300, 300);
+            for (let i = 0; i < segments.length; i++) {
+                const start = i * arcSize + rotation;
+                const end = start + arcSize;
+                ctx.beginPath();
+                ctx.moveTo(150, 150);
+                ctx.arc(150, 150, 140, start, end);
+                ctx.fillStyle = segments[i].color;
+                ctx.fill();
+                ctx.stroke();
+                ctx.save();
+                ctx.translate(150, 150);
+                ctx.rotate(start + arcSize/2);
+                ctx.fillStyle = "#000";
+                ctx.font = "bold 12px Arial";
+                ctx.fillText(segments[i].label, 80, 5);
+                ctx.restore();
+            }
+        }
+
+        function getResult(finalAngle) {
+            const normalized = (finalAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+            const index = Math.floor(normalized / arcSize) % segments.length;
+            return segments[segments.length - 1 - index];
+        }
+
+        function checkCooldown() {
+            const lastSpin = localStorage.getItem('lastSpinTime');
+            if (!lastSpin) return true;
+            const elapsed = (Date.now() - parseInt(lastSpin)) / 1000;
+            if (elapsed < COOLDOWN_SEC) {
+                cooldownMsg.textContent = `Wait ${Math.ceil(COOLDOWN_SEC - elapsed)}s`;
+                btn.disabled = true;
+                setTimeout(checkCooldown, 1000);
+                return false;
+            }
+            btn.disabled = false;
+            cooldownMsg.textContent = '';
+            return true;
+        }
+
+        btn.addEventListener('click', () => {
+            if (spinning || !checkCooldown()) return;
+            spinning = true;
+            btn.disabled = true;
+            const spins = 5 + Math.random() * 5;
+            const finalAngle = angle + spins * 2 * Math.PI;
+            let current = angle;
+            const duration = 3000;
+            const startTime = Date.now();
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                current = angle + (finalAngle - angle) * eased;
+                drawWheel(current);
+                if (progress < 1) requestAnimationFrame(animate);
+                else {
+                    angle = finalAngle;
+                    localStorage.setItem('lastSpinTime', Date.now());
+                    const result = getResult(finalAngle);
+                    tg.sendData(JSON.stringify({ prize: result.label, userId: tg.initDataUnsafe?.user?.id }));
+                    tg.showAlert(`You won: ${result.label}`);
+                    spinning = false;
+                    checkCooldown();
+                }
+            }
+            animate();
+        });
+
+        drawWheel(angle);
+        checkCooldown();
+    </script>
+</body>
+</html>
